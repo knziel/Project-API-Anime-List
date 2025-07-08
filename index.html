@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anime Search</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-4">
+    <header class="w-full max-w-4xl text-center py-6">
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Anime Search</h1>
+        <p class="text-gray-600 mt-2">Discover your favorite anime</p>
+    </header>
+    <main class="w-full max-w-4xl">
+        <form id="search-form" class="flex justify-center mb-8">
+            <input 
+                type="text" 
+                id="search-input" 
+                placeholder="Search for an anime..." 
+                class="w-full max-w-md p-3 rounded-l-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+            <button 
+                type="submit" 
+                class="bg-blue-500 text-white p-3 rounded-r-lg hover:bg-blue-600 transition"
+            >
+                Search
+            </button>
+        </form>
+        <div id="loading" class="hidden text-center text-gray-600 text-lg">Loading...</div>
+        <div id="error" class="hidden text-center text-red-500 text-lg"></div>
+        <section id="results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></section>
+    </main>
+    <!-- Modal for anime details -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 overflow-y-auto max-h-[80vh]">
+            <h2 id="modal-title" class="text-xl font-semibold text-gray-800 mb-4"></h2>
+            <img id="modal-image" class="w-full h-64 object-cover rounded-md mb-4" alt="Anime image" loading="lazy">
+            <p id="modal-type" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-genres" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-aired" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-studio" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-producers" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-score" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-rank" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-episodes" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-status" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-popularity" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-rating" class="text-gray-600 text-sm mb-2"></p>
+            <p id="modal-synopsis" class="text-gray-600 text-sm mb-4"></p>
+            <p id="modal-background" class="text-gray-600 text-sm mb-4"></p>
+            <button id="close-modal" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Close</button>
+        </div>
+    </div>
+    <script>
+        const searchForm = document.getElementById('search-form');
+        const searchInput = document.getElementById('search-input');
+        const resultsDiv = document.getElementById('results');
+        const loadingDiv = document.getElementById('loading');
+        const errorDiv = document.getElementById('error');
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalImage = document.getElementById('modal-image');
+        const modalType = document.getElementById('modal-type');
+        const modalGenres = document.getElementById('modal-genres');
+        const modalAired = document.getElementById('modal-aired');
+        const modalStudio = document.getElementById('modal-studio');
+        const modalProducers = document.getElementById('modal-producers');
+        const modalScore = document.getElementById('modal-score');
+        const modalRank = document.getElementById('modal-rank');
+        const modalEpisodes = document.getElementById('modal-episodes');
+        const modalStatus = document.getElementById('modal-status');
+        const modalPopularity = document.getElementById('modal-popularity');
+        const modalRating = document.getElementById('modal-rating');
+        const modalSynopsis = document.getElementById('modal-synopsis');
+        const modalBackground = document.getElementById('modal-background');
+        const closeModal = document.getElementById('close-modal');
+
+        // Debounce function to limit API calls
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Show modal with anime details
+        function showModal(anime) {
+            if (!anime) {
+                modalTitle.textContent = 'Error';
+                modalImage.src = '';
+                modalImage.alt = 'No image';
+                modalType.textContent = '';
+                modalGenres.textContent = '';
+                modalAired.textContent = '';
+                modalStudio.textContent = '';
+                modalProducers.textContent = '';
+                modalScore.textContent = '';
+                modalRank.textContent = '';
+                modalEpisodes.textContent = '';
+                modalStatus.textContent = '';
+                modalPopularity.textContent = '';
+                modalRating.textContent = '';
+                modalSynopsis.textContent = 'Failed to load anime details.';
+                modalBackground.textContent = '';
+                modal.classList.remove('hidden');
+                return;
+            }
+            modalTitle.textContent = anime.title || 'No title available';
+            modalImage.src = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || '';
+            modalImage.alt = anime.title || 'Anime image';
+            modalType.textContent = `Type: ${anime.type || 'N/A'}`;
+            modalGenres.textContent = `Genres: ${anime.genres?.map(g => g.name).join(', ') || 'N/A'}`;
+            modalAired.textContent = `Aired: ${anime.aired?.string || 'N/A'}`;
+            modalStudio.textContent = `Studio: ${anime.studios?.[0]?.name || 'N/A'}`;
+            modalProducers.textContent = `Producers: ${anime.producers?.map(p => p.name).join(', ') || 'N/A'}`;
+            modalScore.textContent = `Score: ${anime.score || 'N/A'}`;
+            modalRank.textContent = `Rank: #${anime.rank || 'N/A'}`;
+            modalEpisodes.textContent = `Episodes: ${anime.episodes || 'N/A'}`;
+            modalStatus.textContent = `Status: ${anime.status || 'N/A'}`;
+            modalPopularity.textContent = `Popularity: #${anime.popularity || 'N/A'}`;
+            modalRating.textContent = `Rating: ${anime.rating || 'N/A'}`;
+            modalSynopsis.textContent = anime.synopsis || 'No synopsis available.';
+            modalBackground.textContent = anime.background || 'No background info available.';
+            modal.classList.remove('hidden');
+        }
+
+        // Close modal
+        closeModal.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+
+        // Encode JSON for data attribute
+        function encodeAnimeData(anime) {
+            return btoa(encodeURIComponent(JSON.stringify(anime)));
+        }
+
+        // Decode JSON from data attribute
+        function decodeAnimeData(encoded) {
+            try {
+                return JSON.parse(decodeURIComponent(atob(encoded)));
+            } catch (e) {
+                console.error('Error decoding anime data:', e);
+                return null;
+            }
+        }
+
+        // Fetch anime data from API
+        async function fetchAnime(query) {
+            try {
+                loadingDiv.classList.remove('hidden');
+                errorDiv.classList.add('hidden');
+                resultsDiv.innerHTML = '';
+
+                const response = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error('Failed to fetch data from API');
+
+                const data = await response.json();
+                const animeList = data.data;
+
+                if (animeList.length === 0) {
+                    errorDiv.textContent = 'No anime found for your search.';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
+                animeList.forEach(anime => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition';
+                    card.innerHTML = `
+                        <img src="${anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || ''}" alt="${anime.title || 'Anime image'}" class="w-full h-auto max-h-96 object-contain rounded-md mb-4" loading="lazy">
+                        <h2 class="text-xl font-semibold text-gray-800">${anime.title || 'No title'}</h2>
+                        <p class="text-gray-600 text-sm mt-2 line-clamp-3">${anime.synopsis || 'No synopsis available.'}</p>
+                        <button class="view-details mt-4 inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" data-anime='${encodeAnimeData(anime)}'>View Details</button>
+                    `;
+                    resultsDiv.appendChild(card);
+                });
+
+                // Add event listeners to view details buttons
+                resultsDiv.querySelectorAll('.view-details').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const encoded = button.getAttribute('data-anime');
+                        const anime = decodeAnimeData(encoded);
+                        showModal(anime);
+                    });
+                });
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred while fetching data. Please try again later.';
+                errorDiv.classList.remove('hidden');
+            } finally {
+                loadingDiv.classList.add('hidden');
+            }
+        }
+
+        // Fetch top anime
+        async function fetchTopAnime() {
+            try {
+                loadingDiv.classList.remove('hidden');
+                errorDiv.classList.add('hidden');
+                resultsDiv.innerHTML = '';
+
+                const response = await fetch('https://api.jikan.moe/v4/top/anime?limit=6');
+                if (!response.ok) throw new Error('Failed to fetch top anime');
+
+                const data = await response.json();
+                const animeList = data.data;
+
+                animeList.forEach(anime => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition';
+                    card.innerHTML = `
+                        <img src="${anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || ''}" alt="${anime.title || 'Anime image'}" class="w-full h-auto max-h-96 object-contain rounded-md mb-4" loading="lazy">
+                        <h2 class="text-xl font-semibold text-gray-800">${anime.title || 'No title'}</h2>
+                        <p class="text-gray-600 text-sm mt-2 line-clamp-3">${anime.synopsis || 'No synopsis available.'}</p>
+                        <button class="view-details mt-4 inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" data-anime='${encodeAnimeData(anime)}'>View Details</button>
+                    `;
+                    resultsDiv.appendChild(card);
+                });
+
+                // Add event listeners to view details buttons
+                resultsDiv.querySelectorAll('.view-details').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const encoded = button.getAttribute('data-anime');
+                        const anime = decodeAnimeData(encoded);
+                        showModal(anime);
+                    });
+                });
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred while fetching top anime. Please try again later.';
+                errorDiv.classList.remove('hidden');
+            } finally {
+                loadingDiv.classList.add('hidden');
+            }
+        }
+
+        // Handle form submission
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = searchInput.value.trim();
+            if (query) {
+                fetchAnime(query);
+            } else {
+                fetchTopAnime();
+            }
+        });
+
+        // Debounced input event for real-time search
+        const debouncedSearch = debounce((query) => {
+            if (query) {
+                fetchAnime(query);
+            } else {
+                fetchTopAnime();
+            }
+        }, 500);
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            debouncedSearch(query);
+        });
+
+        // Load top anime on page load
+        window.addEventListener('load', fetchTopAnime);
+    </script>
+</body>
+</html>
