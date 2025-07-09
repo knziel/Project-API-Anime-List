@@ -1,0 +1,3 @@
+.hover\:shadow-neon:hover {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.5), 0 0 30px rgba(147, 51, 234, 0.3);
+}
